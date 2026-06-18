@@ -42,14 +42,18 @@ def append_row(sheet_name, row_dict):
     wb.save(DB)
 
 def update_cell(sheet_name, id_val, col_name, new_val, id_col='ID'):
+    update_row(sheet_name, id_val, {col_name: new_val}, id_col)
+
+def update_row(sheet_name, id_val, fields: dict, id_col='ID'):
     wb = load_workbook(DB)
     ws = wb[sheet_name]
     headers = [ws.cell(1, c).value for c in range(1, ws.max_column+1)]
     id_idx = headers.index(id_col) + 1
-    col_idx = headers.index(col_name) + 1
+    col_map = {name: headers.index(name) + 1 for name in fields if name in headers}
     for row in ws.iter_rows(min_row=2):
         if str(row[id_idx-1].value) == str(id_val):
-            row[col_idx-1].value = new_val
+            for col_name, col_idx in col_map.items():
+                row[col_idx-1].value = fields[col_name]
             break
     wb.save(DB)
 
@@ -339,8 +343,7 @@ def edit_equipment(eq_id):
         'Maint_Plan_M': f.get('maint_plan',''),
         'Task_List_M': f.get('task_list',''),
     }
-    for col, val in fields.items():
-        update_cell('Equipment', eq_id, col, val)
+    update_row('Equipment', eq_id, fields)
     return jsonify({'ok': True})
 
 # ── TBM CRUD ─────────────────────────────────────────────────────────────────
