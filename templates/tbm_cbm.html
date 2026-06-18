@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · MHCV{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_sub %}{{ rows|length }} active tasks · Add, edit or remove tasks from the schedule{% endblock %}
+
+{% set url_prefix = sheet.lower() %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary btn-sm" onclick="openModal('add-modal')">＋ Add Task</button>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+.month-badge {
+  display:inline-block; padding:2px 6px; border-radius:4px;
+  font-size:10px; font-weight:700; margin:1px;
+  background:#e8eaf6; color:#283593;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="alert alert-info">
+  <strong>Month Index Guide:</strong>
+  0=APR · 1=MAY · 2=JUN · 3=JUL · 4=AUG · 5=SEP · 6=OCT · 7=NOV · 8=DEC · 9=JAN · 10=FEB · 11=MAR
+  — Enter comma-separated values in the "Due Months" field.
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Task / Activity Name</th>
+          <th style="width:120px">Frequency</th>
+          <th>Due Months</th>
+          <th>Equipment Scope</th>
+          <th style="width:100px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        {% set mn = ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','JAN','FEB','MAR'] %}
+        <tr>
+          <td style="text-align:center; color:var(--muted)">{{ loop.index }}</td>
+          <td style="font-weight:500">{{ r.Task_Name or r.Activity_Name }}</td>
+          <td>
+            <span class="badge badge-{{ 'tbm' if sheet=='TBM' else 'cbm' }}">{{ r.Frequency }}</span>
+          </td>
+          <td>
+            {% set idxs = r.Due_Month_Indices.split(',') if r.Due_Month_Indices else [] %}
+            {% for idx in idxs %}
+              {% set i = idx.strip() %}
+              {% if i.isdigit() %}
+                <span class="month-badge">{{ mn[i|int] }}</span>
+              {% endif %}
+            {% endfor %}
+            <span style="font-size:10px; color:var(--muted)">({{ r.Due_Month_Indices }})</span>
+          </td>
+          <td style="font-size:11px; color:var(--muted)">{{ r.Equipment_Scope }}</td>
+          <td>
+            <button class="btn btn-ghost btn-xs" onclick="openEdit({{ r|tojson }})">✏️ Edit</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteTask({{ r.ID }}, '{{ (r.Task_Name or r.Activity_Name)|replace("'","") }}')">🗑</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>＋ Add {{ title }} Task</span>
+      <span class="modal-close" onclick="closeModal('add-modal')">✕</span>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Task / Activity Name</label>
+        <input type="text" id="add-name" placeholder="Describe the maintenance task...">
+      </div>
+      <div class="form-group">
+        <label>Frequency</label>
+        <select id="add-freq">
+          <option>Monthly</option>
+          <option>Quarterly</option>
+          <option>Half Yearly</option>
+          <option>Yearly</option>
+          <option>2 Yearly</option>
+          <option>3 Yearly</option>
+          <option>5 Yearly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Month Indices (comma-separated)</label>
+        <input type="text" id="add-months" placeholder="e.g. 0,3,6,9">
+      </div>
+      <div class="form-group full">
+        <label>Equipment Scope</label>
+        <input type="text" id="add-scope" placeholder="e.g. All Cranes, Conveyor, Hoist 01...">
+      </div>
+    </div>
+    <div style="background:#f8fafc; border-radius:6px; padding:10px; margin-top:12px; font-size:11px; color:var(--muted)">
+      <strong>Month Index Reference:</strong><br>
+      0=APR · 1=MAY · 2=JUN · 3=JUL · 4=AUG · 5=SEP · 6=OCT · 7=NOV · 8=DEC · 9=JAN · 10=FEB · 11=MAR
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAdd()">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>✏️ Edit Task</span>
+      <span class="modal-close" onclick="closeModal('edit-modal')">✕</span>
+    </div>
+    <input type="hidden" id="edit-id">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Task / Activity Name</label>
+        <input type="text" id="edit-name">
+      </div>
+      <div class="form-group">
+        <label>Frequency</label>
+        <select id="edit-freq">
+          <option>Monthly</option>
+          <option>Quarterly</option>
+          <option>Half Yearly</option>
+          <option>Yearly</option>
+          <option>2 Yearly</option>
+          <option>3 Yearly</option>
+          <option>5 Yearly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Month Indices</label>
+        <input type="text" id="edit-months">
+      </div>
+      <div class="form-group full">
+        <label>Equipment Scope</label>
+        <input type="text" id="edit-scope">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SHEET = '{{ sheet }}';
+
+function submitAdd() {
+  const fd = new FormData();
+  fd.append('task_name',       document.getElementById('add-name').value);
+  fd.append('frequency',       document.getElementById('add-freq').value);
+  fd.append('due_months',      document.getElementById('add-months').value);
+  fd.append('equipment_scope', document.getElementById('add-scope').value);
+  fetch(`/${SHEET.toLowerCase()}/add`, {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){ toast('✅ Task added'); closeModal('add-modal'); location.reload(); }
+    });
+}
+
+function openEdit(r) {
+  document.getElementById('edit-id').value    = r.ID;
+  document.getElementById('edit-name').value  = r.Task_Name || r.Activity_Name || '';
+  document.getElementById('edit-freq').value  = r.Frequency || '';
+  document.getElementById('edit-months').value= r.Due_Month_Indices || '';
+  document.getElementById('edit-scope').value = r.Equipment_Scope || '';
+  openModal('edit-modal');
+}
+
+function submitEdit() {
+  const id = document.getElementById('edit-id').value;
+  const fd = new FormData();
+  fd.append('task_name',       document.getElementById('edit-name').value);
+  fd.append('frequency',       document.getElementById('edit-freq').value);
+  fd.append('due_months',      document.getElementById('edit-months').value);
+  fd.append('equipment_scope', document.getElementById('edit-scope').value);
+  fetch(`/${SHEET.toLowerCase()}/edit/${id}`, {method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){ toast('✅ Saved'); closeModal('edit-modal'); location.reload(); }
+    });
+}
+
+function deleteTask(id, name) {
+  if(!confirm(`Delete task:\n"${name}"?`)) return;
+  fetch(`/${SHEET.toLowerCase()}/delete/${id}`, {method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){ toast('Task removed'); location.reload(); }
+    });
+}
+</script>
+{% endblock %}
