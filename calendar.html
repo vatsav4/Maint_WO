@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% block title %}{{ month_name }} Tasks · MHCV{% endblock %}
+{% block page_title %}{{ month_name }} — Maintenance Tasks{% endblock %}
+{% block page_sub %}FY {{ fy }}  ·  {{ tasks|length }} total tasks  ·  {{ done }} done · {{ pending }} pending · {{ deferred }} deferred{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn btn-ghost btn-sm" href="/calendar/{{ (month_idx-1)%12 }}">← {{ months[(month_idx-1)%12] }}</a>
+<a class="btn btn-ghost btn-sm" href="/calendar/{{ (month_idx+1)%12 }}">{{ months[(month_idx+1)%12] }} →</a>
+<a class="btn btn-primary btn-sm" href="/export/{{ month_idx }}" target="_blank">📥 Export {{ month_name }}</a>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+.filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.filter-btn {
+  padding:4px 12px; border-radius:20px; font-size:11px; font-weight:600;
+  cursor:pointer; border:1.5px solid var(--border); background:var(--white);
+  color:var(--muted); transition:all .15s;
+}
+.filter-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.task-row { transition: background .1s; }
+.status-btn {
+  padding:3px 9px; border-radius:12px; font-size:10px; font-weight:700;
+  cursor:pointer; border:none; transition:opacity .15s;
+}
+.status-btn:hover { opacity:.8; }
+.status-done     { background:#d5f5e3; color:#145a32; }
+.status-pending  { background:#fef9e7; color:#7d6608; }
+.status-deferred { background:#fdedec; color:#922b21; }
+.remarks-cell { font-size:11px; color:var(--muted); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- MONTH TABS -->
+<div class="month-tabs">
+  {% for m in months %}
+  <a class="month-tab {% if loop.index0 == month_idx %}active{% endif %}"
+     href="/calendar/{{ loop.index0 }}">{{ m }}</a>
+  {% endfor %}
+</div>
+
+<!-- SUMMARY CHIPS -->
+<div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+  <span class="badge badge-done" style="font-size:12px; padding:5px 12px">✅ Done: {{ done }}</span>
+  <span class="badge badge-pending" style="font-size:12px; padding:5px 12px">⏳ Pending: {{ pending }}</span>
+  <span class="badge badge-deferred" style="font-size:12px; padding:5px 12px">⏭️ Deferred: {{ deferred }}</span>
+  <span class="badge" style="background:#e8eaf6; color:#283593; font-size:12px; padding:5px 12px">Total: {{ tasks|length }}</span>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span style="font-size:11px; font-weight:600; color:var(--muted)">Filter:</span>
+  <button class="filter-btn active" onclick="filterType('all',this)">All</button>
+  <button class="filter-btn" onclick="filterType('PM-Monthly',this)">PM-Monthly</button>
+  <button class="filter-btn" onclick="filterType('PM-Quarterly',this)">PM-Quarterly</button>
+  <button class="filter-btn" onclick="filterType('PM-HalfYearly',this)">PM-Half Yearly</button>
+  <button class="filter-btn" onclick="filterType('PM-Yearly',this)">PM-Yearly</button>
+  <button class="filter-btn" onclick="filterType('TBM',this)">TBM</button>
+  <button class="filter-btn" onclick="filterType('CBM',this)">CBM</button>
+  <button class="filter-btn" onclick="filterStatus('PENDING',this)" style="border-color:#e67e22; color:#e67e22">⏳ Pending only</button>
+</div>
+
+<!-- TASKS TABLE -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="tbl-wrap">
+    <table id="tasks-table">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Type</th>
+          <th>Ref No</th>
+          <th>Equip No</th>
+          <th>Equipment / Task</th>
+          <th>Freq.</th>
+          <th>Maint Plan</th>
+          <th>Task List</th>
+          <th style="width:110px">Status</th>
+          <th>Remarks</th>
+          <th style="width:90px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tasks %}
+        <tr class="task-row" data-type="{{ t.type }}" data-status="{{ t.status }}"
+            data-idx="{{ loop.index0 }}"
+            id="row-{{ loop.index0 }}">
+          <td style="text-align:center; color:var(--muted)">{{ loop.index }}</td>
+          <td>
+            {% set cls = t.type.lower().replace('-','') %}
+            <span class="badge badge-{{ cls }}">{{ t.type }}</span>
+          </td>
+          <td style="font-size:11px; color:var(--muted)">{{ t.ref or '—' }}</td>
+          <td style="font-size:11px; font-weight:600">{{ t.equip_no }}</td>
+          <td style="font-weight:500">{{ t.task_name }}</td>
+          <td style="font-size:11px">{{ t.frequency }}</td>
+          <td style="font-size:11px; color:var(--muted)">{{ t.maint_plan or '—' }}</td>
+          <td style="font-size:11px; color:var(--muted)">{{ t.task_list or '—' }}</td>
+          <td>
+            <span class="status-btn status-{{ t.status.lower() }}"
+                  onclick="cycleStatus({{ loop.index0 }}, this)"
+                  id="status-{{ loop.index0 }}">
+              {{ t.status }}
+            </span>
+          </td>
+          <td class="remarks-cell" id="remarks-{{ loop.index0 }}" title="{{ t.remarks }}">
+            {{ t.remarks or '' }}
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-xs" onclick="openRemarksModal({{ loop.index0 }})">✏️ Note</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Task data for JS -->
+<script>
+const TASKS = {{ tasks | tojson }};
+const MONTH_IDX = {{ month_idx }};
+const STATUS_CYCLE = ['PENDING','DONE','DEFERRED'];
+
+function cycleStatus(idx, el) {
+  const cur = el.textContent.trim();
+  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur)+1) % STATUS_CYCLE.length];
+  el.textContent = next;
+  el.className = 'status-btn status-' + next.toLowerCase();
+  const row = document.getElementById('row-'+idx);
+  row.dataset.status = next;
+  saveStatus(idx, next, document.getElementById('remarks-'+idx).textContent.trim());
+}
+
+function saveStatus(idx, status, remarks) {
+  const t = TASKS[idx];
+  fetch('/update_status', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      month_idx: MONTH_IDX,
+      task_type: t.type,
+      task_name: t.task_name,
+      equip_no:  t.equip_no,
+      equip_name:t.equip_name,
+      ref:       t.ref,
+      frequency: t.frequency,
+      status:    status,
+      remarks:   remarks
+    })
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) toast(status === 'DONE' ? '✅ Marked Done' : `Status → ${status}`);
+  }).catch(()=>toast('Save failed','error'));
+}
+
+// Remarks modal
+let activeIdx = null;
+function openRemarksModal(idx) {
+  activeIdx = idx;
+  document.getElementById('remarks-modal-text').value =
+    document.getElementById('remarks-'+idx).textContent.trim();
+  openModal('remarks-modal');
+}
+function saveRemarks() {
+  const txt = document.getElementById('remarks-modal-text').value.trim();
+  document.getElementById('remarks-'+activeIdx).textContent = txt;
+  document.getElementById('remarks-'+activeIdx).title = txt;
+  const curStatus = document.getElementById('status-'+activeIdx).textContent.trim();
+  saveStatus(activeIdx, curStatus, txt);
+  closeModal('remarks-modal');
+  toast('Remarks saved');
+}
+
+// Filters
+function filterType(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.task-row').forEach(row=>{
+    row.style.display = (type==='all' || row.dataset.type===type) ? '' : 'none';
+  });
+}
+function filterStatus(status, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.task-row').forEach(row=>{
+    row.style.display = row.dataset.status===status ? '' : 'none';
+  });
+}
+</script>
+
+<!-- REMARKS MODAL -->
+<div class="modal-overlay" id="remarks-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>✏️ Add / Edit Remarks</span>
+      <span class="modal-close" onclick="closeModal('remarks-modal')">✕</span>
+    </div>
+    <div class="form-group">
+      <label>Remarks / Observations</label>
+      <textarea id="remarks-modal-text" rows="4"
+        placeholder="e.g. Replaced chain pin, found minor wear on roller..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('remarks-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRemarks()">Save Remarks</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
