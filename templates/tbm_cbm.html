@@ -61,7 +61,7 @@
           </td>
           <td style="font-size:11px; color:var(--muted)">{{ r.Equipment_Scope }}</td>
           <td>
-            <button class="btn btn-ghost btn-xs" onclick="openEdit({{ r|tojson }})">✏️ Edit</button>
+            <button class="btn btn-ghost btn-xs" onclick='openEdit({{ r|tojson }})'>✏️ Edit</button>
             <button class="btn btn-danger btn-xs" onclick="deleteTask({{ r.ID }}, '{{ (r.Task_Name or r.Activity_Name)|replace("'","") }}')">🗑</button>
           </td>
         </tr>
