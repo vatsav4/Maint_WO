@@ -68,7 +68,7 @@
           <td style="font-size:11px; color:var(--muted)">{{ r.Ref_Monthly or '—' }}</td>
           <td>
             <button class="btn btn-ghost btn-xs"
-              onclick="openEdit({{ r|tojson }})">✏️ Edit</button>
+              onclick='openEdit({{ r|tojson }})'>✏️ Edit</button>
             <button class="btn btn-danger btn-xs"
               onclick="deleteEq({{ r.ID }}, '{{ r.Equip_Name }}')">🗑</button>
           </td>
